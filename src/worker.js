@@ -28,7 +28,7 @@ export default {
       }
       return json({
         title: env.TITLE || "Family Calendar",
-        agendaDays: clampInt(env.AGENDA_DAYS || env.DAYS, 7, 2, 14),
+        agendaDays: clampInt(env.AGENDA_DAYS || env.DAYS, 60, 7, 120),
         timeFormat: env.TIME_FORMAT === "24h" ? "24h" : "12h",
         timeLabel: env.TIME_LABEL || "",
         weather: {
