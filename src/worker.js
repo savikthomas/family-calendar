@@ -27,6 +27,8 @@ export default {
         return json({ error: err.message }, 500);
       }
       return json({
+        // changes on every deploy; the page reloads itself when it sees a new value
+        version: (env.CF_VERSION_METADATA && env.CF_VERSION_METADATA.id) || "",
         title: env.TITLE || "Family Calendar",
         agendaDays: clampInt(env.AGENDA_DAYS || env.DAYS, 60, 7, 120),
         timeFormat: env.TIME_FORMAT === "24h" ? "24h" : "12h",
