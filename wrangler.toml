@@ -1,0 +1,27 @@
+name = "family-calendar"
+main = "src/worker.js"
+compatibility_date = "2025-10-01"
+
+# Free Workers plan is plenty: ~1 config + 1 request per calendar every 5 minutes.
+
+[vars]
+TITLE = "Thomas Family Calendar"
+TIME_LABEL = "SEA"                 # shown after the clock, e.g. 10:24 AM (SEA). "" to hide
+TIME_FORMAT = "12h"                # "12h" or "24h"
+AGENDA_DAYS = "7"                  # how many days ahead the right-hand list looks
+LOCATION_NAME = "Federal Way, WA"
+WEATHER_LAT = "47.3223"
+WEATHER_LON = "-122.3126"
+TEMP_UNITS = "celsius"             # or "fahrenheit"
+WORLD_CLOCKS = '[{"label":"India (IST)","tz":"Asia/Kolkata","flag":"🇮🇳"},{"label":"Qatar (AST)","tz":"Asia/Qatar","flag":"🇶🇦"}]'
+# People shown on the display. Events on a shared calendar are tagged with a person when their
+# name appears in the title ("Shan: Soccer") or one of their emails is invited. "match" adds extra
+# keywords/emails. Untagged events keep the calendar's own name and color (e.g. "Family").
+PEOPLE = '[{"name":"Savi","color":"#1F5BFF"},{"name":"Aby","color":"#FF2E7E"},{"name":"Shan","color":"#14A9B8"},{"name":"Ann","color":"#8A2BF2"}]'
+NIGHT_START = "22"                 # dim the screen from 10 PM...
+NIGHT_END = "6"                    # ...until 6 AM (set both equal to disable)
+NIGHT_DIM = "0.7"                  # 0 = no dimming, 0.9 = nearly black
+
+# Secrets (NOT in this file) — set with:
+#   npx wrangler secret put CALENDARS     e.g. [{"name":"Family","color":"#F08A24","url":"https://calendar.google.com/...basic.ics"}]
+#   npx wrangler secret put ACCESS_KEY

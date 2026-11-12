@@ -1,0 +1,749 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Family Calendar</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&family=Noto+Color+Emoji&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #1B2333;
+    --muted: #8A93A6;
+    --card: rgba(255, 255, 255, .9);
+    --line: #E6EAF2;
+    --blue: #2B63D9;
+    --navy: #14254D;
+    --red: #C9302C;
+    --emoji: "Noto Color Emoji", "Apple Color Emoji", "Segoe UI Emoji", sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; overflow: hidden; cursor: none; }
+  body {
+    font-family: "Inter", "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+    color: var(--ink); -webkit-font-smoothing: antialiased;
+    background: linear-gradient(180deg, #7FA6DE 0%, #A9BCE8 30%, #CDC3E6 58%, #EDBFD0 80%, #F3C4C0 100%);
+  }
+  .emoji { font-family: var(--emoji); line-height: 1; }
+  svg.i { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+  #mountains { position: fixed; left: 0; right: 0; bottom: 0; width: 100%; height: 22vh; }
+  #app { position: absolute; inset: 0; transition: transform 3s ease; }
+
+  /* ---------- top bar ---------- */
+  header {
+    position: absolute; left: 0; right: 0; top: 0; height: 10.2vh;
+    display: flex; align-items: center; padding: 0 3vw;
+    background: linear-gradient(90deg, #1C4FAE 0%, #2B66CF 55%, #2F6FD8 100%);
+    color: #fff; box-shadow: 0 .4vh 2vh rgba(20, 40, 90, .25);
+  }
+  header .home { font-size: 5.4vh; stroke-width: 1.8; }
+  header .sep { width: 2px; height: 5vh; background: rgba(255, 255, 255, .45); margin: 0 1.2vw; }
+  #title { font-size: 5.2vh; font-weight: 700; letter-spacing: -.01em; white-space: nowrap; }
+  header .right { margin-left: auto; display: flex; align-items: center; gap: 2.4vw; white-space: nowrap; }
+  #hdr-date { font-size: 3.3vh; font-weight: 500; }
+  #hdr-time { font-size: 3.5vh; font-weight: 700; }
+  #hdr-time .tz { color: #A9C6FF; font-weight: 600; margin-left: .4vw; }
+  #hdr-wx { display: flex; align-items: center; gap: .8vw; font-size: 3.5vh; font-weight: 600; padding-left: 2.4vw; border-left: 2px solid rgba(255, 255, 255, .45); }
+  #hdr-wx .emoji { font-size: 4.6vh; }
+
+  /* ---------- grid ---------- */
+  main {
+    position: absolute; top: 12.4vh; bottom: 3vh; left: 1vw; right: 1vw;
+    display: grid; gap: 2vh 1vw;
+    grid-template-columns: 17.6vw minmax(0, 1fr) 33.2vw;
+    grid-template-rows: minmax(0, 1fr) 22.8vh;
+  }
+  .card { background: var(--card); border-radius: 2.8vh; box-shadow: 0 .5vh 2.4vh rgba(40, 50, 100, .12); }
+  #left { grid-column: 1; grid-row: 1; display: flex; flex-direction: column; gap: 1.8vh; min-height: 0; }
+  #month { grid-column: 2; grid-row: 1; min-height: 0; }
+  #wx { grid-column: 1 / 3; grid-row: 2; }
+  #agenda { grid-column: 3; grid-row: 1 / 3; min-height: 0; }
+
+  /* family */
+  #family { padding: 1.8vh .9vw 1.8vh; }
+  #family h2 { font-size: 3.6vh; font-weight: 800; margin: 0 0 1.2vh .5vw; }
+  .member {
+    display: flex; align-items: center; gap: .9vw; background: #fff; border-radius: 1.6vh;
+    padding: .9vh .8vw; margin-top: .9vh; font-size: 2.9vh; font-weight: 600;
+    box-shadow: 0 .2vh .8vh rgba(40, 50, 100, .1);
+  }
+  .member .dot { width: 3.6vh; height: 3.6vh; }
+  .dot { border-radius: 50%; flex: none; display: inline-block; }
+
+  /* world clocks */
+  #clocks { flex: 1; min-height: 0; padding: 1.4vh .7vw; display: flex; flex-direction: column; gap: 1.4vh; justify-content: center; }
+  .wclock { flex: 1; max-height: 13vh; display: flex; align-items: center; gap: .9vw; border-radius: 1.8vh; padding: 0 .9vw; }
+  .wclock:nth-child(4n+1) { background: #FDF0DC; }
+  .wclock:nth-child(4n+2) { background: #F1EAF8; }
+  .wclock:nth-child(4n+3) { background: #E4F3EC; }
+  .wclock:nth-child(4n+4) { background: #E5EEFB; }
+  .wclock .flag { font-size: 5.2vh; }
+  .wclock > div { min-width: 0; }
+  .wclock .lbl { font-size: 2.3vh; font-weight: 600; white-space: nowrap; }
+  .wclock .tm { font-size: 3.7vh; font-weight: 800; letter-spacing: -.02em; white-space: nowrap; }
+
+  /* month */
+  #month { display: flex; flex-direction: column; padding: 2vh 1.2vw 1.4vh; }
+  #month h1 { text-align: center; font-size: 4.6vh; font-weight: 700; margin-bottom: 1.6vh; letter-spacing: -.01em; }
+  .wk-head, .wk { display: grid; grid-template-columns: repeat(7, 1fr); }
+  .wk-head { background: #EEF2FB; border-radius: 1.6vh; padding: .5vh .3vw; }
+  .wk-head div { text-align: center; font-size: 2.6vh; font-weight: 600; color: #2A3D6B; padding: .7vh 0; border-radius: 1.2vh; }
+  .wk-head div.we { background: #DDE3F7; }
+  .weeks { flex: 1; min-height: 0; display: grid; }
+  .wk { border-bottom: 1px solid var(--line); }
+  .wk:last-child { border-bottom: none; }
+  .cell { border-right: 1px solid var(--line); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .9vh; }
+  .cell:last-child { border-right: none; }
+  .cell .num { font-size: 3vh; font-weight: 600; }
+  .cell.sun .num { color: var(--red); }
+  .cell.other .num { color: #A4AAB8; font-weight: 500; }
+  .cell .dots { display: flex; gap: .35vw; height: 1.5vh; }
+  .cell .dots .dot { width: 1.5vh; height: 1.5vh; }
+  .cell.today { position: relative; }
+  .cell.today::before { content: ""; position: absolute; inset: .7vh .5vw; background: var(--navy); border-radius: 1.6vh; }
+  .cell.today > * { position: relative; }
+  .cell.today .num { color: #fff; }
+
+  /* weather strip */
+  #wx { display: flex; align-items: stretch; padding: 1.8vh 1.2vw; gap: 1.2vw; }
+  .wx-now { width: 22vw; display: flex; flex-direction: column; justify-content: center; align-items: center; border-right: 2px solid var(--line); padding-right: 1vw; }
+  .wx-loc { align-self: flex-start; display: flex; align-items: center; gap: .5vw; font-size: 2.7vh; font-weight: 700; color: #213A75; }
+  .wx-loc svg { width: 3vh; height: 3vh; fill: var(--blue); stroke: none; }
+  .wx-main { display: flex; align-items: center; gap: 1.2vw; margin: .6vh 0; }
+  .wx-main .emoji { font-size: 9vh; }
+  .wx-main .t { font-size: 8.4vh; font-weight: 700; letter-spacing: -.03em; }
+  .wx-desc { font-size: 2.8vh; font-weight: 600; color: #213A75; }
+  .wx-days { flex: 1; display: grid; grid-template-columns: repeat(5, 1fr); gap: .9vw; }
+  .wx-day { border-radius: 2vh; background: rgba(255, 255, 255, .85); box-shadow: 0 .2vh 1vh rgba(40, 50, 100, .1); display: flex; flex-direction: column; align-items: center; justify-content: space-evenly; padding: 1vh 0; }
+  .wx-day.today { background: #DDE8FA; }
+  .wx-day .d { font-size: 2.7vh; font-weight: 700; color: #213A75; }
+  .wx-day .sd { font-size: 2vh; font-weight: 600; color: #213A75; margin-top: -.6vh; }
+  .wx-day .emoji { font-size: 6vh; }
+  .wx-day .hl { font-size: 2.9vh; font-weight: 700; color: #213A75; }
+
+  /* agenda */
+  #agenda { padding: 1.2vh .6vw; display: flex; flex-direction: column; }
+  #agenda-list { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; gap: 1.2vh; }
+  .grp { flex: none; border-radius: 2.2vh; background: var(--tint); padding: .9vh .5vw .7vh; }
+  .grp-h { display: flex; align-items: center; gap: .7vw; font-size: 3.2vh; font-weight: 700; padding: .1vh .5vw .7vh; white-space: nowrap; }
+  .grp-h svg { color: var(--acc); font-size: 3.2vh; }
+  .grp-h .acc { color: var(--acc); }
+  .row {
+    display: flex; align-items: center; gap: .7vw; background: rgba(255, 255, 255, .92);
+    border-radius: 1.3vh; padding: .75vh .6vw; margin-top: .6vh; position: relative;
+  }
+  .row .bar { width: .45vw; min-width: 5px; align-self: stretch; border-radius: 9px; background: var(--c); }
+  .row .tm { width: 6.6vw; font-size: 2.35vh; font-weight: 600; white-space: nowrap; }
+  .row .ic { font-size: 3.4vh; color: #1F2A44; stroke-width: 1.8; }
+  .row .nm { flex: 1; min-width: 0; font-size: 2.45vh; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row .pills { display: flex; gap: .3vw; flex: none; }
+  .pill { font-size: 2.2vh; font-weight: 600; padding: .45vh .9vw; border-radius: 99px; background: var(--pbg); border: 1px solid var(--pbd); }
+  .row.past { opacity: .45; }
+  .row.now { box-shadow: 0 0 0 .3vh var(--c); }
+  .row.none { color: var(--muted); font-size: 2.3vh; font-weight: 600; justify-content: center; padding: 1.2vh; }
+  .more { font-size: 2.1vh; font-weight: 700; color: #5A6480; text-align: center; padding-top: .6vh; flex: none; }
+
+  #status { position: absolute; right: 1.2vw; bottom: .6vh; font-size: 1.5vh; font-weight: 600; color: rgba(40, 40, 70, .55); }
+  #status.warn { color: #B4381C; }
+  #dim { position: fixed; inset: 0; background: #000; opacity: 0; pointer-events: none; transition: opacity 90s linear; }
+</style>
+</head>
+<body>
+<svg id="mountains" viewBox="0 0 1600 220" preserveAspectRatio="none" aria-hidden="true">
+  <path d="M0 120 L120 80 L220 110 L340 50 L470 105 L600 70 L720 112 L860 40 L990 100 L1120 62 L1250 108 L1380 58 L1500 96 L1600 72 V220 H0Z" fill="#9A8CC6" opacity=".55"/>
+  <path d="M0 160 L140 118 L260 150 L400 100 L540 150 L690 112 L820 158 L960 104 L1100 150 L1240 116 L1380 156 L1500 120 L1600 140 V220 H0Z" fill="#6E5FA8" opacity=".6"/>
+  <path d="M0 200 L180 168 L330 192 L500 160 L680 196 L860 166 L1040 198 L1220 170 L1400 196 L1600 172 V220 H0Z" fill="#4A3F84" opacity=".7"/>
+</svg>
+
+<div id="app">
+  <header>
+    <svg class="i home" viewBox="0 0 24 24"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></svg>
+    <span class="sep"></span>
+    <span id="title">Family Calendar</span>
+    <div class="right">
+      <span id="hdr-date"></span>
+      <span id="hdr-time"></span>
+      <span id="hdr-wx"></span>
+    </div>
+  </header>
+
+  <main>
+    <div id="left">
+      <section id="family" class="card"><h2>Family</h2><div id="members"></div></section>
+      <section id="clocks" class="card"></section>
+    </div>
+    <section id="month" class="card">
+      <h1 id="month-title"></h1>
+      <div class="wk-head"><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div class="we">Sat</div><div class="we">Sun</div></div>
+      <div class="weeks" id="weeks"></div>
+    </section>
+    <section id="wx" class="card"></section>
+    <section id="agenda" class="card"><div id="agenda-list"></div></section>
+  </main>
+  <div id="status">Loading…</div>
+</div>
+<div id="dim"></div>
+
+<script>window.FORCE_DEMO=true</script>
+<script src="https://cdn.jsdelivr.net/npm/ical.js@1.5.0/build/ical.min.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  var DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  var MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  var MONTH_FULL = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  var ACCENTS = ["#2B63D9", "#7B3FE4", "#1FA35B", "#EE8A1F"];
+  var CAL_REFRESH_MS = 5 * 60 * 1000, WX_REFRESH_MS = 30 * 60 * 1000;
+
+  var qs = new URLSearchParams(location.search);
+  var KEY = qs.get("key") || "";
+  var DEMO = qs.has("demo") || window.FORCE_DEMO === true;
+
+  var config = {
+    title: "Family Calendar", agendaDays: 7, timeFormat: "12h", timeLabel: "",
+    weather: { lat: null, lon: null, units: "fahrenheit", name: "" },
+    night: { start: 22, end: 6, dim: 0.7 }, clocks: [], calendars: []
+  };
+  var events = [], weather = null, lastSync = null, syncError = null;
+  var $ = function (id) { return document.getElementById(id); };
+
+  // ---------- helpers ----------
+  function el(tag, cls, text) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text != null) n.textContent = text;
+    return n;
+  }
+  function pad(n) { return (n < 10 ? "0" : "") + n; }
+  function startOfDay(d) { return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
+  function addDays(d, n) { return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n); }
+  function dateKey(d) { return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); }
+  function hexToRgba(hex, a) {
+    var h = String(hex || "#888").replace("#", "");
+    if (h.length === 3) h = h.split("").map(function (c) { return c + c; }).join("");
+    var n = parseInt(h, 16) || 0;
+    return "rgba(" + ((n >> 16) & 255) + "," + ((n >> 8) & 255) + "," + (n & 255) + "," + a + ")";
+  }
+  function fmtTime(d) {
+    var h = d.getHours(), m = d.getMinutes();
+    if (config.timeFormat === "24h") return pad(h) + ":" + pad(m);
+    return (h % 12 || 12) + ":" + pad(m) + " " + (h < 12 ? "AM" : "PM");
+  }
+  function shortDate(d) { return DOW[d.getDay()] + ", " + MON[d.getMonth()] + " " + d.getDate(); }
+  function withKey(path) { return KEY ? path + (path.indexOf("?") < 0 ? "?" : "&") + "key=" + encodeURIComponent(KEY) : path; }
+  function fetchWithTimeout(url, ms) {
+    var ctl = new AbortController();
+    var t = setTimeout(function () { ctl.abort(); }, ms || 20000);
+    return fetch(url, { signal: ctl.signal, cache: "no-store" }).finally(function () { clearTimeout(t); });
+  }
+  function overlaps(e, ds, de) {
+    if (e.end.getTime() === e.start.getTime()) return e.start >= ds && e.start < de;
+    return e.start < de && e.end > ds;
+  }
+
+  // ---------- icons ----------
+  var ICONS = {
+    ball: '<circle cx="12" cy="12" r="9"/><path d="M12 7.5l3.8 2.8-1.5 4.4H9.7l-1.5-4.4z"/><path d="M12 7.5V3.2M15.8 10.3l4-1.3M14.3 14.7l2.4 3.6M9.7 14.7l-2.4 3.6M8.2 10.3l-4-1.3"/>',
+    cart: '<path d="M2.5 4h2.2l2.4 10.5h10.6l2.1-7.5H6"/><circle cx="9" cy="19" r="1.6"/><circle cx="17" cy="19" r="1.6"/>',
+    music: '<path d="M9 18V5.5l11-2.2v12.4"/><circle cx="6.2" cy="18" r="2.8"/><circle cx="17.2" cy="15.7" r="2.8"/>',
+    laptop: '<rect x="4" y="5" width="16" height="10.5" rx="1.4"/><path d="M2 19h20"/>',
+    doctor: '<path d="M5 3H4v6a5 5 0 0 0 10 0V3h-1"/><path d="M9 14v1.5a5.5 5.5 0 0 0 11 0V13"/><circle cx="20" cy="11" r="2"/>',
+    gym: '<path d="M6.5 7v10M3.5 9.5v5M17.5 7v10M20.5 9.5v5M6.5 12h11"/>',
+    people: '<circle cx="9" cy="8" r="3"/><path d="M3.5 20c0-3.1 2.5-5.6 5.5-5.6s5.5 2.5 5.5 5.6"/><circle cx="17" cy="9" r="2.4"/><path d="M16.2 14.3c2.6.3 4.6 2.6 4.6 5.4"/>',
+    cake: '<path d="M4 21h16v-7.5H4z"/><path d="M4 17c2 1.4 4 1.4 6 0s4-1.4 6 0 4 1.4 4 0"/><path d="M12 13.5V9.5M12 6.6V5"/>',
+    book: '<path d="M4 4.5h5.5A2.5 2.5 0 0 1 12 7v13a2 2 0 0 0-2-2H4z"/><path d="M20 4.5h-5.5A2.5 2.5 0 0 0 12 7v13a2 2 0 0 1 2-2h6z"/>',
+    plane: '<path d="M10.5 20l1.5-6-5.5-1-2 2.2-1.6-.6L4 11 2.5 7.8l1.6-.6 2 2.3 5.6-.9L10 2.5l2-.5 4 6.8 4.6-.8a1.6 1.6 0 0 1 .5 3.1l-4.4 1.6-2.4 7.4z"/>',
+    car: '<path d="M5 16h14v-4l-2-5H7l-2 5z"/><path d="M5 16v2.5M19 16v2.5M3.5 11.5H5M19 11.5h1.5"/><circle cx="8" cy="13.5" r=".6"/><circle cx="16" cy="13.5" r=".6"/>',
+    church: '<path d="M12 2v5M10 4h4M6 21V11l6-4 6 4v10M3 21h18M10 21v-4a2 2 0 0 1 4 0v4"/>',
+    cal: '<rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M3 10h18M8 3v4M16 3v4"/>'
+  };
+  var ICON_RULES = [
+    [/birthday|bday|cake/i, "cake"],
+    [/piano|music|band|choir|guitar|violin|concert|recital|singing/i, "music"],
+    [/soccer|football|basketball|baseball|cricket|tennis|game|match|tournament/i, "ball"],
+    [/grocer|shopping|costco|target|walmart|store|pickup|pick-up|errand/i, "cart"],
+    [/doctor|dentist|clinic|hospital|checkup|check-up|pediatric|ortho|vet\b|medical|appointment/i, "doctor"],
+    [/gym|workout|yoga|run\b|running|swim|fitness|karate|dance|ballet|practice/i, "gym"],
+    [/family|youth|party|outing|dinner|lunch|visit|club|friends|picnic|movie/i, "people"],
+    [/meeting|call|sync|standup|stand-up|zoom|teams|interview|work|office/i, "laptop"],
+    [/flight|airport|trip|travel|vacation/i, "plane"],
+    [/drive|drop-?off|carpool|car\b|service/i, "car"],
+    [/church|mass|prayer|worship|bible/i, "church"],
+    [/school|class|homework|exam|test|tutor|lesson|library/i, "book"]
+  ];
+  function iconFor(title) {
+    for (var i = 0; i < ICON_RULES.length; i++) if (ICON_RULES[i][0].test(title)) return ICON_RULES[i][1];
+    return "cal";
+  }
+  function svgIcon(name, cls) {
+    var s = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    s.setAttribute("viewBox", "0 0 24 24");
+    s.setAttribute("class", "i " + (cls || ""));
+    s.innerHTML = ICONS[name] || ICONS.cal;
+    return s;
+  }
+
+  // ---------- ICS parsing (recurrences, exceptions, time zones) ----------
+  // ICS-PARSER-START
+  function expandIcs(text, calIndex, rangeStart, rangeEnd) {
+    var root = new ICAL.Component(ICAL.parse(text));
+    root.getAllSubcomponents("vtimezone").forEach(function (tz) {
+      var id = tz.getFirstPropertyValue("tzid");
+      if (id && !ICAL.TimezoneService.has(id)) ICAL.TimezoneService.register(tz);
+    });
+
+    var masters = [], exceptions = [], out = [], byUid = {};
+    root.getAllSubcomponents("vevent").forEach(function (v) {
+      var ev = new ICAL.Event(v);
+      if (ev.isRecurrenceException()) exceptions.push(ev);
+      else { masters.push(ev); byUid[ev.uid] = ev; }
+    });
+    exceptions.forEach(function (ex) {
+      var m = byUid[ex.uid];
+      if (m && m.isRecurring()) m.relateException(ex);
+      else masters.push(ex); // orphan exception: show it as a normal event
+    });
+
+    function add(item, s, e) {
+      var status = item.component.getFirstPropertyValue("status");
+      if (status && String(status).toUpperCase() === "CANCELLED") return;
+      var allDay = s.isDate;
+      var start = s.toJSDate();
+      var end = e ? e.toJSDate() : null;
+      if (!end || end < start) end = allDay ? addDays(start, 1) : new Date(start.getTime());
+      if (allDay && end.getTime() === start.getTime()) end = addDays(start, 1);
+      if (start >= rangeEnd || end < rangeStart || (end.getTime() === rangeStart.getTime() && end > start)) return;
+      out.push({
+        uid: item.uid || "",
+        title: (item.summary || "(No title)").trim(),
+        start: start, end: end, allDay: allDay,
+        cals: [calIndex]
+      });
+    }
+
+    var scanFrom = new Date(rangeStart.getTime() - 40 * 86400000); // allow long multi-day events to overlap
+    masters.forEach(function (ev) {
+      try {
+        if (ev.isRecurring()) {
+          var it = ev.iterator(), next, guard = 0;
+          while ((next = it.next()) && guard++ < 100000) {
+            if (next.toJSDate() < scanFrom) continue;
+            var d = ev.getOccurrenceDetails(next);
+            if (d.startDate.toJSDate() >= rangeEnd && next.toJSDate() >= rangeEnd) break;
+            add(d.item, d.startDate, d.endDate);
+          }
+        } else {
+          add(ev, ev.startDate, ev.endDate);
+        }
+      } catch (err) {
+        console.warn("Skipping event", ev.summary, err);
+      }
+    });
+    return out;
+  }
+  // ICS-PARSER-END
+
+
+  function mergeDuplicates(list) {
+    var seen = {}, out = [];
+    list.forEach(function (e) {
+      var k = (e.uid || e.title.toLowerCase()) + "|" + e.start.getTime() + "|" + e.allDay;
+      var prev = seen[k];
+      if (prev) e.cals.forEach(function (c) { if (prev.cals.indexOf(c) < 0) prev.cals.push(c); });
+      else { seen[k] = e; out.push(e); }
+    });
+    return out;
+  }
+
+  function visibleRange() {
+    var today = startOfDay(new Date());
+    var first = new Date(today.getFullYear(), today.getMonth(), 1);
+    var gridStart = addDays(first, -((first.getDay() + 6) % 7));
+    var gridEnd = addDays(gridStart, 42);
+    var agendaEnd = addDays(today, config.agendaDays + 1);
+    return { start: addDays(gridStart < today ? gridStart : today, -1), end: gridEnd > agendaEnd ? gridEnd : agendaEnd };
+  }
+
+  // ---------- data loading ----------
+  function refreshCalendars() {
+    if (DEMO) {
+      config = demoConfig();
+      events = mergeDuplicates(demoEvents());
+      lastSync = new Date(); syncError = null;
+      applyStatic(); renderAll();
+      return Promise.resolve();
+    }
+    return fetchWithTimeout(withKey("/api/config"))
+      .then(function (r) { if (!r.ok) throw new Error("Config HTTP " + r.status); return r.json(); })
+      .then(function (cfg) {
+        if (cfg.error) throw new Error(cfg.error);
+        var wxChanged = JSON.stringify(cfg.weather) !== JSON.stringify(config.weather);
+        config = cfg;
+        applyStatic();
+        if (wxChanged) refreshWeather();
+        var range = visibleRange();
+        return Promise.all(config.calendars.map(function (c, i) {
+          return fetchWithTimeout(withKey("/api/ics/" + i), 30000)
+            .then(function (r) { if (!r.ok) throw new Error(c.name + " (HTTP " + r.status + ")"); return r.text(); })
+            .then(function (t) { return { ok: true, list: expandIcs(t, i, range.start, range.end) }; })
+            .catch(function (err) { return { ok: false, err: err }; });
+        }));
+      })
+      .then(function (results) {
+        var fresh = [], failed = [];
+        results.forEach(function (r, i) {
+          if (r.ok) fresh = fresh.concat(r.list);
+          else {
+            failed.push(r.err && r.err.message ? r.err.message : config.calendars[i].name);
+            fresh = fresh.concat(events.filter(function (e) { return e.cals[0] === i; }));
+          }
+        });
+        events = mergeDuplicates(fresh);
+        lastSync = new Date();
+        syncError = failed.length ? "Couldn't refresh: " + failed.join(", ") : null;
+      })
+      .catch(function (err) { syncError = "Offline — " + (err && err.message ? err.message : "retrying"); })
+      .then(renderAll);
+  }
+
+  var WMO = {
+    0: ["☀️", "Sunny", "🌙", "Clear"], 1: ["🌤️", "Mostly Sunny", "🌙", "Mostly Clear"], 2: ["⛅", "Partly Cloudy", "☁️"], 3: ["☁️", "Cloudy"],
+    45: ["🌫️", "Fog"], 48: ["🌫️", "Fog"],
+    51: ["🌦️", "Drizzle"], 53: ["🌦️", "Drizzle"], 55: ["🌦️", "Drizzle"], 56: ["🌧️", "Freezing Drizzle"], 57: ["🌧️", "Freezing Drizzle"],
+    61: ["🌧️", "Light Rain"], 63: ["🌧️", "Rain"], 65: ["🌧️", "Heavy Rain"], 66: ["🌧️", "Freezing Rain"], 67: ["🌧️", "Freezing Rain"],
+    71: ["🌨️", "Light Snow"], 73: ["🌨️", "Snow"], 75: ["❄️", "Heavy Snow"], 77: ["🌨️", "Snow"],
+    80: ["🌦️", "Showers"], 81: ["🌧️", "Showers"], 82: ["🌧️", "Heavy Showers"], 85: ["🌨️", "Snow Showers"], 86: ["🌨️", "Snow Showers"],
+    95: ["⛈️", "Thunderstorms"], 96: ["⛈️", "Thunderstorms"], 99: ["⛈️", "Thunderstorms"]
+  };
+  function wmo(code, isDay) {
+    var w = WMO[code] || ["🌡️", ""];
+    var night = isDay === 0 && w[2];
+    return { icon: night ? w[2] : w[0], text: night && w[3] ? w[3] : w[1] };
+  }
+
+  function refreshWeather() {
+    if (DEMO) { weather = demoWeather(); renderAll(); return; }
+    var w = config.weather;
+    if (!w || w.lat == null || w.lon == null) { weather = null; renderAll(); return; }
+    var url = "https://api.open-meteo.com/v1/forecast?latitude=" + w.lat + "&longitude=" + w.lon +
+      "&current=temperature_2m,weather_code,is_day&daily=weather_code,temperature_2m_max,temperature_2m_min" +
+      "&temperature_unit=" + (w.units === "celsius" ? "celsius" : "fahrenheit") + "&timezone=auto&forecast_days=7";
+    fetchWithTimeout(url)
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        var daily = {};
+        (d.daily && d.daily.time || []).forEach(function (t, i) {
+          daily[t] = { code: d.daily.weather_code[i], max: d.daily.temperature_2m_max[i], min: d.daily.temperature_2m_min[i] };
+        });
+        weather = { current: { temp: d.current.temperature_2m, code: d.current.weather_code, isDay: d.current.is_day }, daily: daily };
+        renderAll();
+      })
+      .catch(function () { /* keep last weather */ });
+  }
+
+  // ---------- rendering ----------
+  function applyStatic() {
+    $("title").textContent = config.title || "Family Calendar";
+    document.title = config.title || "Family Calendar";
+    var m = $("members");
+    m.textContent = "";
+    config.calendars.forEach(function (c) {
+      if (c.hidden) return;
+      var row = el("div", "member");
+      var dot = el("span", "dot"); dot.style.background = c.color;
+      row.appendChild(dot); row.appendChild(el("span", null, c.name));
+      m.appendChild(row);
+    });
+    var box = $("clocks");
+    box.textContent = "";
+    (config.clocks || []).forEach(function (c) {
+      var w = el("div", "wclock");
+      w.appendChild(el("span", "flag emoji", c.flag || "🕒"));
+      var r = el("div");
+      r.appendChild(el("div", "lbl", c.label || c.tz));
+      var tm = el("div", "tm"); tm.setAttribute("data-tz", c.tz);
+      r.appendChild(tm);
+      w.appendChild(r);
+      box.appendChild(w);
+    });
+    $("clocks").style.display = (config.clocks || []).length ? "" : "none";
+  }
+
+  function renderClock() {
+    var now = new Date();
+    $("hdr-date").textContent = shortDate(now);
+    var t = $("hdr-time");
+    t.textContent = fmtTime(now);
+    if (config.timeLabel) t.appendChild(el("span", "tz", "(" + config.timeLabel + ")"));
+    Array.prototype.forEach.call(document.querySelectorAll(".wclock .tm"), function (n) {
+      try {
+        n.textContent = new Intl.DateTimeFormat("en-US", {
+          timeZone: n.getAttribute("data-tz"), hour: "numeric", minute: "2-digit",
+          hour12: config.timeFormat !== "24h"
+        }).format(now);
+      } catch (e) { n.textContent = "--:--"; }
+    });
+  }
+
+  function renderHeaderWeather() {
+    var box = $("hdr-wx");
+    box.textContent = "";
+    if (!weather) { box.style.display = "none"; return; }
+    box.style.display = "";
+    box.appendChild(el("span", "emoji", wmo(weather.current.code, weather.current.isDay).icon));
+    box.appendChild(el("span", null, Math.round(weather.current.temp) + "°" + (config.weather.units === "celsius" ? "C" : "F")));
+  }
+
+  function renderMonth() {
+    var today = startOfDay(new Date());
+    var first = new Date(today.getFullYear(), today.getMonth(), 1);
+    var gridStart = addDays(first, -((first.getDay() + 6) % 7));
+    var lastOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    var weeksNeeded = Math.ceil((((first.getDay() + 6) % 7) + lastOfMonth.getDate()) / 7);
+    $("month-title").textContent = MONTH_FULL[today.getMonth()] + " " + today.getFullYear();
+    var weeks = $("weeks");
+    weeks.style.gridTemplateRows = "repeat(" + weeksNeeded + ", 1fr)";
+    var frag = document.createDocumentFragment();
+    for (var w = 0; w < weeksNeeded; w++) {
+      var row = el("div", "wk");
+      for (var d = 0; d < 7; d++) {
+        var ds = addDays(gridStart, w * 7 + d), de = addDays(ds, 1);
+        var cls = "cell";
+        if (ds.getMonth() !== today.getMonth()) cls += " other";
+        if (ds.getDay() === 0) cls += " sun";
+        if (ds.getTime() === today.getTime()) cls += " today";
+        var cell = el("div", cls);
+        cell.appendChild(el("div", "num", ds.getDate()));
+        var who = [];
+        events.forEach(function (e) {
+          if (overlaps(e, ds, de)) e.cals.forEach(function (c) { if (who.indexOf(c) < 0) who.push(c); });
+        });
+        who.sort(function (a, b) { return a - b; });
+        var dots = el("div", "dots");
+        who.slice(0, 4).forEach(function (c) {
+          var cal = config.calendars[c]; if (!cal) return;
+          var dot = el("span", "dot"); dot.style.background = cal.color; dots.appendChild(dot);
+        });
+        cell.appendChild(dots);
+        row.appendChild(cell);
+      }
+      frag.appendChild(row);
+    }
+    weeks.textContent = "";
+    weeks.appendChild(frag);
+  }
+
+  function renderWeatherPanel() {
+    var box = $("wx");
+    box.textContent = "";
+    if (!weather) {
+      box.appendChild(el("div", "wx-desc", config.weather && config.weather.lat != null ? "Loading weather…" : "Set WEATHER_LAT / WEATHER_LON to show weather"));
+      return;
+    }
+    var now = el("div", "wx-now");
+    var loc = el("div", "wx-loc");
+    var pin = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    pin.setAttribute("viewBox", "0 0 24 24");
+    pin.innerHTML = '<path d="M12 2a7 7 0 0 0-7 7c0 5.2 7 13 7 13s7-7.8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/>';
+    loc.appendChild(pin);
+    loc.appendChild(el("span", null, config.weather.name || ""));
+    now.appendChild(loc);
+    var c = wmo(weather.current.code, weather.current.isDay);
+    var main = el("div", "wx-main");
+    main.appendChild(el("span", "emoji", c.icon));
+    main.appendChild(el("span", "t", Math.round(weather.current.temp) + "°" + (config.weather.units === "celsius" ? "C" : "F")));
+    now.appendChild(main);
+    now.appendChild(el("div", "wx-desc", c.text));
+    box.appendChild(now);
+
+    var days = el("div", "wx-days");
+    var today = startOfDay(new Date());
+    for (var i = 0; i < 5; i++) {
+      var d = addDays(today, i), f = weather.daily[dateKey(d)];
+      var card = el("div", "wx-day" + (i === 0 ? " today" : ""));
+      card.appendChild(el("div", "d", i === 0 ? "Today" : DOW[d.getDay()] + " " + d.getDate()));
+      if (i === 0) card.appendChild(el("div", "sd", DOW[d.getDay()] + " " + d.getDate()));
+      card.appendChild(el("div", "emoji", f ? wmo(f.code, 1).icon : "–"));
+      card.appendChild(el("div", "hl", f ? Math.round(f.max) + "° / " + Math.round(f.min) + "°" : ""));
+      days.appendChild(card);
+    }
+    box.appendChild(days);
+  }
+
+  function renderAgenda() {
+    var now = new Date(), today = startOfDay(now);
+    var list = $("agenda-list");
+    var frag = document.createDocumentFragment();
+    var groupIndex = 0;
+    for (var i = 0; i < config.agendaDays; i++) {
+      var ds = addDays(today, i), de = addDays(ds, 1);
+      var dayEvents = events.filter(function (e) { return overlaps(e, ds, de); })
+        .sort(function (a, b) {
+          if (a.allDay !== b.allDay) return a.allDay ? -1 : 1;
+          return a.start - b.start || a.title.localeCompare(b.title);
+        });
+      if (i > 1 && !dayEvents.length) continue;
+
+      var acc = ACCENTS[groupIndex++ % ACCENTS.length];
+      var g = el("div", "grp");
+      g.style.setProperty("--acc", acc);
+      g.style.setProperty("--tint", hexToRgba(acc, 0.13));
+      if (i < 2) g.setAttribute("data-keep", "1");
+      var h = el("div", "grp-h");
+      h.appendChild(svgIcon("cal"));
+      if (i < 2) {
+        h.appendChild(el("span", null, i === 0 ? "Today" : "Tomorrow"));
+        h.appendChild(el("span", "acc", "· " + shortDate(ds)));
+      } else {
+        h.appendChild(el("span", null, shortDate(ds)));
+      }
+      g.appendChild(h);
+
+      if (!dayEvents.length) g.appendChild(el("div", "row none", "No events"));
+      dayEvents.forEach(function (e) { g.appendChild(agendaRow(e, ds, de, now)); });
+      frag.appendChild(g);
+    }
+    list.textContent = "";
+    list.appendChild(frag);
+    fitAgenda(list);
+  }
+
+  function agendaRow(e, ds, de, now) {
+    var cal = config.calendars[e.cals[0]] || { color: "#888", name: "" };
+    var r = el("div", "row");
+    r.style.setProperty("--c", cal.color);
+    r.appendChild(el("span", "bar"));
+    var label;
+    if (e.allDay) label = "All Day";
+    else if (e.start < ds && e.end > de) label = "All Day";
+    else if (e.start < ds) label = "Until " + fmtTime(e.end);
+    else label = fmtTime(e.start);
+    if (!e.allDay && e.start <= now && e.end > now) r.className += " now";
+    else if (!e.allDay && e.end < now) r.className += " past";
+    r.appendChild(el("span", "tm", label));
+    r.appendChild(svgIcon(iconFor(e.title), "ic"));
+    r.appendChild(el("span", "nm", e.title));
+    var pills = el("span", "pills");
+    e.cals.slice(0, 2).forEach(function (ci) {
+      var c = config.calendars[ci]; if (!c) return;
+      var p = el("span", "pill", c.name);
+      p.style.setProperty("--pbg", hexToRgba(c.color, 0.2));
+      p.style.setProperty("--pbd", hexToRgba(c.color, 0.35));
+      pills.appendChild(p);
+    });
+    if (e.cals.length > 2) pills.appendChild(el("span", "pill", "+" + (e.cals.length - 2)));
+    r.appendChild(pills);
+    return r;
+  }
+
+  function fitAgenda(list) {
+    if (list.scrollHeight <= list.clientHeight + 1) return;
+    var rows = Array.prototype.slice.call(list.querySelectorAll(".row:not(.none)"));
+    var order = rows.filter(function (x) { return x.classList.contains("past"); })
+      .concat(rows.filter(function (x) { return !x.classList.contains("past"); }).reverse());
+    var more = el("div", "more");
+    list.appendChild(more);
+    var hidden = 0;
+    for (var i = 0; i < order.length && list.scrollHeight > list.clientHeight + 1; i++) {
+      var g = order[i].parentNode;
+      g.removeChild(order[i]);
+      hidden++;
+      if (!g.querySelector(".row")) {
+        if (g.getAttribute("data-keep")) g.appendChild(el("div", "row none", "No more events"));
+        else g.parentNode.removeChild(g);
+      }
+      more.textContent = "+" + hidden + " more event" + (hidden > 1 ? "s" : "");
+    }
+  }
+
+  function renderStatus() {
+    var s = $("status");
+    s.className = syncError ? "warn" : "";
+    s.textContent = DEMO ? "Demo data" : syncError ? syncError + (lastSync ? " · last good data " + fmtTime(lastSync) : "") : "";
+  }
+
+  function renderAll() {
+    renderClock(); renderHeaderWeather(); renderMonth(); renderWeatherPanel(); renderAgenda(); renderStatus();
+  }
+
+  // ---------- screen care ----------
+  function isNight(h) {
+    var s = config.night.start, e = config.night.end;
+    if (s === e) return false;
+    return s < e ? (h >= s && h < e) : (h >= s || h < e);
+  }
+  function screenCare(now) {
+    $("dim").style.opacity = isNight(now.getHours()) ? String(config.night.dim) : "0";
+    var dx = Math.round(Math.random() * 8 - 4), dy = Math.round(Math.random() * 6 - 3);
+    $("app").style.transform = "translate(" + dx + "px," + dy + "px)";
+  }
+
+  // ---------- demo data (preview / ?demo) ----------
+  function demoConfig() {
+    return {
+      title: "Thomas Family Calendar", agendaDays: 7, timeFormat: "12h", timeLabel: "SEA",
+      weather: { lat: null, lon: null, units: "celsius", name: "Federal Way, WA" },
+      night: { start: 22, end: 6, dim: 0.7 },
+      clocks: [{ label: "India (IST)", tz: "Asia/Kolkata", flag: "🇮🇳" }, { label: "Qatar (AST)", tz: "Asia/Qatar", flag: "🇶🇦" }],
+      calendars: [
+        { name: "Savi", color: "#1F5BFF" }, { name: "Aby", color: "#FF2E7E" },
+        { name: "Shan", color: "#14A9B8" }, { name: "Ann", color: "#8A2BF2" }
+      ]
+    };
+  }
+  function demoEvents() {
+    var t = startOfDay(new Date());
+    function at(d, h, m) { var x = addDays(t, d); x.setHours(h, m || 0, 0, 0); return x; }
+    function E(c, title, d, h, m, mins) { var s = at(d, h, m); return { uid: title + d + c, title: title, start: s, end: new Date(s.getTime() + mins * 60000), allDay: false, cals: [c] }; }
+    function A(c, title, d, len) { return { uid: title + d, title: title, start: addDays(t, d), end: addDays(t, d + (len || 1)), allDay: true, cals: [c] }; }
+    var list = [
+      E(2, "Soccer Practice", 0, 15, 30, 90), E(1, "Grocery Pickup", 0, 17, 30, 30), E(3, "Piano Lesson", 0, 19, 0, 45),
+      E(0, "Team Meeting", 1, 16, 0, 60),
+      E(3, "Doctor Appointment", 2, 10, 0, 45), E(2, "Youth Meeting", 2, 18, 0, 90),
+      A(0, "Band Practice (School)", 3),
+      E(0, "Gym", 4, 9, 0, 60), E(1, "Family Outing", 4, 13, 0, 180),
+      E(2, "Soccer Game", 5, 10, 0, 90), E(1, "Church", 5, 11, 0, 90)
+    ];
+    // sprinkle earlier/later events across the month for the dots
+    var pattern = [[-20, 0], [-18, 1], [-18, 2], [-15, 3], [-13, 1], [-11, 0], [-10, 2], [-9, 3], [-9, 1], [-6, 0], [-4, 3], [-3, 2], [8, 0], [9, 1], [11, 2], [12, 3], [14, 0], [15, 2], [17, 1], [19, 3]];
+    pattern.forEach(function (p, i) { list.push(E(p[1], "Event " + i, p[0], 12, 0, 60)); });
+    return list;
+  }
+  function demoWeather() {
+    var codes = [2, 61, 2, 63, 1, 3, 0], daily = {};
+    var hi = [6, 7, 8, 7, 9, 8, 7], lo = [1, 3, 2, 4, 3, 2, 1];
+    for (var i = 0; i < 7; i++) daily[dateKey(addDays(new Date(), i))] = { code: codes[i], max: hi[i], min: lo[i] };
+    return { current: { temp: 4, code: 2, isDay: 1 }, daily: daily };
+  }
+
+  // ---------- main loop ----------
+  var lastMinute = -1, lastDay = null, bootedAt = Date.now();
+  function tick() {
+    var now = new Date();
+    if (now.getMinutes() === lastMinute) return;
+    lastMinute = now.getMinutes();
+    if (lastDay !== now.getDate()) {
+      lastDay = now.getDate();
+      refreshCalendars();
+    } else {
+      renderClock(); renderAgenda();
+    }
+    if (now.getMinutes() % 3 === 0) screenCare(now);
+    if (now.getHours() === 3 && now.getMinutes() === 30 && Date.now() - bootedAt > 3600000) location.reload();
+  }
+
+  renderAll();
+  screenCare(new Date());
+  refreshWeather();
+  tick();
+  setInterval(tick, 1000);
+  setInterval(refreshCalendars, CAL_REFRESH_MS);
+  setInterval(refreshWeather, WX_REFRESH_MS);
+  window.addEventListener("resize", renderAll);
+})();
+</script>
+</body>
+</html>
