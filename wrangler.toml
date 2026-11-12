@@ -10,13 +10,13 @@ binding = "CF_VERSION_METADATA"
 
 [vars]
 TITLE = "Thomas Family Calendar"
-TIME_LABEL = "SEA"                 # shown after the clock, e.g. 10:24 AM (SEA). "" to hide
+TIME_LABEL = ""                    # text shown after the clock, e.g. "SEA"; empty to hide
 TIME_FORMAT = "12h"                # "12h" or "24h"
 AGENDA_DAYS = "60"                 # how far ahead Up Next and the right-hand list look for events
 LOCATION_NAME = "Federal Way, WA"
 WEATHER_LAT = "47.3223"
 WEATHER_LON = "-122.3126"
-TEMP_UNITS = "celsius"             # or "fahrenheit"
+TEMP_UNITS = "fahrenheit"          # or "celsius"
 WORLD_CLOCKS = '[{"label":"India (IST)","tz":"Asia/Kolkata","flag":"🇮🇳"},{"label":"Qatar (AST)","tz":"Asia/Qatar","flag":"🇶🇦"}]'
 # People shown on the display. Events on a shared calendar are tagged with a person when their
 # name appears in the title ("Shan: Soccer") or one of their emails is invited. "match" adds extra
