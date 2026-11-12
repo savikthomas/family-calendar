@@ -146,6 +146,10 @@
   .grp { flex: none; border-radius: 2.2vh; background: var(--tint); padding: .9vh .5vw .7vh; }
   .grp-h { display: flex; align-items: center; gap: .7vw; font-size: 3.2vh; font-weight: 700; padding: .1vh .5vw .7vh; white-space: nowrap; }
   .grp-h svg { color: var(--acc); font-size: 3.2vh; }
+  .grp.empty { padding-bottom: .9vh; }
+  .grp.empty .grp-h { padding-bottom: .1vh; font-size: 2.8vh; }
+  .grp.empty .grp-h svg { font-size: 2.8vh; }
+  .grp-h .none-inline { margin-left: auto; font-size: 2.1vh; font-weight: 600; color: var(--muted); }
   .grp-h .acc { color: var(--acc); }
   .row {
     display: flex; align-items: center; gap: .7vw; background: rgba(255, 255, 255, .92);
@@ -636,45 +640,87 @@
     box.appendChild(days);
   }
 
+  // Right column:
+  //  1. show consecutive days from today (empty ones say "No events") for as many as fit;
+  //  2. if there are events after the last day that fits, swap the last empty days
+  //     (never Today/Tomorrow) for those event days, one for one, keeping date order.
+  function agendaGroup(day, now) {
+    var g = el("div", "grp");
+    if (day.i < 2) g.setAttribute("data-keep", "1");
+    var h = el("div", "grp-h");
+    h.appendChild(svgIcon("cal"));
+    if (day.i < 2) {
+      h.appendChild(el("span", null, day.i === 0 ? "Today" : "Tomorrow"));
+      h.appendChild(el("span", "acc", "· " + shortDate(day.ds)));
+    } else {
+      h.appendChild(el("span", null, shortDate(day.ds)));
+      var away = day.i < 7 ? "" : day.i < 14 ? "next week" : "in " + Math.round(day.i / 7) + " weeks";
+      if (away) h.appendChild(el("span", "acc", "· " + away));
+    }
+    g.appendChild(h);
+    if (!day.ev.length) { g.className += " empty"; h.appendChild(el("span", "none-inline", "No events")); }
+    day.ev.forEach(function (e) { g.appendChild(agendaRow(e, day.ds, day.de, now)); });
+    return g;
+  }
+
   function renderAgenda() {
     var now = new Date(), today = startOfDay(now);
     var list = $("agenda-list");
-    var frag = document.createDocumentFragment();
-    var groupIndex = 0, groups = 0;
-    // Today and Tomorrow always show; after that, the next days that have events (up to the lookahead)
-    for (var i = 0; i < lookahead() && groups < 12; i++) {
+    list.textContent = "";
+    function fits() { return list.scrollHeight <= list.clientHeight + 1; }
+
+    var days = [];
+    for (var i = 0; i < lookahead(); i++) {
       var ds = addDays(today, i), de = addDays(ds, 1);
-      var dayEvents = events.filter(function (e) { return overlaps(e, ds, de); })
-        .sort(function (a, b) {
+      days.push({
+        i: i, ds: ds, de: de,
+        ev: events.filter(function (e) { return overlaps(e, ds, de); }).sort(function (a, b) {
           if (a.allDay !== b.allDay) return a.allDay ? -1 : 1;
           return a.start - b.start || a.title.localeCompare(b.title);
-        });
-      if (i > 1 && !dayEvents.length) continue;
-      groups++;
-
-      var acc = ACCENTS[groupIndex++ % ACCENTS.length];
-      var g = el("div", "grp");
-      g.style.setProperty("--acc", acc);
-      g.style.setProperty("--tint", hexToRgba(acc, 0.13));
-      if (i < 2) g.setAttribute("data-keep", "1");
-      var h = el("div", "grp-h");
-      h.appendChild(svgIcon("cal"));
-      if (i < 2) {
-        h.appendChild(el("span", null, i === 0 ? "Today" : "Tomorrow"));
-        h.appendChild(el("span", "acc", "· " + shortDate(ds)));
-      } else {
-        h.appendChild(el("span", null, shortDate(ds)));
-        var away = i < 7 ? "" : i < 14 ? "next week" : "in " + Math.round(i / 7) + " weeks";
-        if (away) h.appendChild(el("span", "acc", "· " + away));
-      }
-      g.appendChild(h);
-
-      if (!dayEvents.length) g.appendChild(el("div", "row none", "No events"));
-      dayEvents.forEach(function (e) { g.appendChild(agendaRow(e, ds, de, now)); });
-      frag.appendChild(g);
+        })
+      });
     }
-    list.textContent = "";
-    list.appendChild(frag);
+
+    // 1. consecutive days while they fit (Today and Tomorrow always)
+    var shown = [];
+    for (var k = 0; k < days.length && k < 31; k++) {
+      var g = agendaGroup(days[k], now);
+      list.appendChild(g);
+      if (!fits() && k >= 2) { list.removeChild(g); break; }
+      shown.push({ d: days[k], el: g });
+      if (!fits()) break;            // Today/Tomorrow alone overflow; trimmed below
+    }
+
+    // 2. swap trailing empty days for later days that have events
+    function lastEmpty() {
+      for (var j = shown.length - 1; j >= 0; j--) if (shown[j].d.i >= 2 && !shown[j].d.ev.length) return j;
+      return -1;
+    }
+    var lastIdx = shown.length ? shown[shown.length - 1].d.i : -1;
+    var future = days.filter(function (d) { return d.i > lastIdx && d.ev.length; });
+    for (var f = 0; f < future.length; f++) {
+      var idx = lastEmpty();
+      if (idx < 0) break;
+      list.removeChild(shown[idx].el); shown.splice(idx, 1);
+      var fg = agendaGroup(future[f], now);
+      list.appendChild(fg); shown.push({ d: future[f], el: fg });
+      while (!fits()) {                // event day is taller: free more empty days
+        var j2 = lastEmpty();
+        if (j2 < 0) break;
+        list.removeChild(shown[j2].el); shown.splice(j2, 1);
+      }
+      if (!fits()) {                   // still no room: drop it and stop
+        list.removeChild(fg); shown.pop();
+        break;
+      }
+    }
+
+    // 3. colors in display order, then trim rows if a busy day still overflows
+    shown.forEach(function (s, n) {
+      var acc = ACCENTS[n % ACCENTS.length];
+      s.el.style.setProperty("--acc", acc);
+      s.el.style.setProperty("--tint", hexToRgba(acc, 0.13));
+    });
     fitAgenda(list);
   }
 
