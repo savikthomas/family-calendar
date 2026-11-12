@@ -62,8 +62,20 @@
   #agenda { grid-column: 3; grid-row: 1 / 3; min-height: 0; }
 
   /* family */
-  #family { padding: 1.8vh .9vw 1.8vh; }
-  #family h2 { font-size: 3.6vh; font-weight: 800; margin: 0 0 1.2vh .5vw; }
+  #upnext { flex: 1; min-height: 0; padding: 2vh 1vw 2.2vh; display: flex; flex-direction: column; }
+  #upnext h2 { display: flex; align-items: center; gap: .6vw; font-size: 3vh; font-weight: 800; color: #213A75; }
+  #upnext h2 svg { font-size: 3.2vh; color: var(--blue); }
+  .un-body { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: center; gap: 1.4vh; }
+  .un-head { display: flex; align-items: center; gap: .8vw; }
+  .un-ic { flex: none; width: 7.4vh; height: 7.4vh; border-radius: 2vh; background: var(--tint); color: var(--c);
+           display: flex; align-items: center; justify-content: center; font-size: 4.4vh; }
+  .un-ic svg { stroke-width: 1.7; }
+  .un-title { font-size: 3.2vh; min-width: 0; font-weight: 800; line-height: 1.15;
+              display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .un-when { font-size: 2.4vh; font-weight: 600; color: #5A6480; }
+  .un-count { font-size: 4.6vh; font-weight: 800; color: var(--c); letter-spacing: -.01em; line-height: 1; }
+  .un-body .pills { display: flex; gap: .4vw; flex-wrap: wrap; }
+  .un-none { color: var(--muted); font-size: 2.6vh; font-weight: 600; text-align: center; }
   .member {
     display: flex; align-items: center; gap: .9vw; background: #fff; border-radius: 1.6vh;
     padding: .9vh .8vw; margin-top: .9vh; font-size: 2.9vh; font-weight: 600;
@@ -73,16 +85,16 @@
   .dot { border-radius: 50%; flex: none; display: inline-block; }
 
   /* world clocks */
-  #clocks { flex: 1; min-height: 0; padding: 1.4vh .7vw; display: flex; flex-direction: column; gap: 1.4vh; justify-content: center; }
-  .wclock { flex: 1; max-height: 13vh; display: flex; align-items: center; gap: .9vw; border-radius: 1.8vh; padding: 0 .9vw; }
+  #clocks { flex: none; padding: 1.4vh .7vw; display: flex; flex-direction: column; gap: 1.4vh; }
+  .wclock { height: 9.4vh; display: flex; align-items: center; gap: .9vw; border-radius: 1.8vh; padding: 0 .9vw; }
   .wclock:nth-child(4n+1) { background: #FDF0DC; }
   .wclock:nth-child(4n+2) { background: #F1EAF8; }
   .wclock:nth-child(4n+3) { background: #E4F3EC; }
   .wclock:nth-child(4n+4) { background: #E5EEFB; }
-  .wclock .flag { font-size: 5.2vh; }
+  .wclock .flag { font-size: 4.6vh; }
   .wclock > div { min-width: 0; }
   .wclock .lbl { font-size: 2.3vh; font-weight: 600; white-space: nowrap; }
-  .wclock .tm { font-size: 3.7vh; font-weight: 800; letter-spacing: -.02em; white-space: nowrap; }
+  .wclock .tm { font-size: 3.4vh; font-weight: 800; letter-spacing: -.02em; white-space: nowrap; }
 
   /* month */
   #month { display: flex; flex-direction: column; padding: 2vh 1.2vw 1.4vh; }
@@ -171,7 +183,7 @@
 
   <main>
     <div id="left">
-      <section id="family" class="card"><h2>Family</h2><div id="members"></div></section>
+      <section id="upnext" class="card"></section>
       <section id="clocks" class="card"></section>
     </div>
     <section id="month" class="card">
@@ -205,7 +217,7 @@
   var config = {
     title: "Family Calendar", agendaDays: 7, timeFormat: "12h", timeLabel: "",
     weather: { lat: null, lon: null, units: "fahrenheit", name: "" },
-    night: { start: 22, end: 6, dim: 0.7 }, clocks: [], calendars: []
+    night: { start: 22, end: 6, dim: 0.7 }, clocks: [], calendars: [], people: [], who: []
   };
   var events = [], weather = null, lastSync = null, syncError = null;
   var $ = function (id) { return document.getElementById(id); };
@@ -320,7 +332,11 @@
         uid: item.uid || "",
         title: (item.summary || "(No title)").trim(),
         start: start, end: end, allDay: allDay,
-        cals: [calIndex]
+        cals: [calIndex],
+        src: calIndex,
+        emails: (item.component.getAllProperties("attendee") || [])
+          .concat(item.component.getAllProperties("organizer") || [])
+          .map(function (pr) { return String(pr.getFirstValue() || "").replace(/^mailto:/i, "").toLowerCase(); })
       });
     }
 
@@ -347,6 +363,43 @@
   // ICS-PARSER-END
 
 
+  // ---------- who is each event for? ----------
+  // With PEOPLE configured, an event is tagged with every person whose name (or extra keyword)
+  // appears as a word in the title, or whose email is on the invite. Otherwise it keeps its
+  // calendar's own name and color (e.g. "Family").
+  function personMatchers() {
+    return (config.people || []).map(function (p) {
+      var keys = [p.name].concat(p.match || []).filter(Boolean).map(function (k) { return String(k).toLowerCase(); });
+      var words = keys.filter(function (k) { return k.indexOf("@") < 0; }).map(function (k) {
+        return new RegExp("(^|[^\\p{L}\\p{N}])" + k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "(?=$|[^\\p{L}\\p{N}])", "iu");
+      });
+      var emails = keys.filter(function (k) { return k.indexOf("@") > 0; });
+      return function (text, mails) {
+        return words.some(function (re) { return re.test(text); }) ||
+          emails.some(function (m) { return mails.indexOf(m) >= 0; });
+      };
+    });
+  }
+  function assignPeople(list, calIndex) {
+    var people = config.people || [];
+    if (!people.length) return list;
+    var matchers = personMatchers();
+    list.forEach(function (e) {
+      var hits = [];
+      matchers.forEach(function (m, pi) { if (m(e.title, e.emails || [])) hits.push(pi); });
+      e.cals = hits.length ? hits : [people.length + calIndex];
+      if (hits.length) {
+        // tidy "Shan: Soccer" / "[Shan] Soccer" / "Shan & Ann - Soccer" -> "Soccer"
+        var m = e.title.match(/^\s*\[([^\]]{1,40})\]\s*(.+)$/) || e.title.match(/^\s*([^:\-–]{1,40}?)\s*[:\-–]\s+(.+)$/);
+        if (m && matchers.some(function (fn) { return fn(m[1], []); }) &&
+            m[1].replace(new RegExp((people.map(function (p) { return p.name; }).concat(["and", "&", ",", "/", "\\+"])).join("|"), "gi"), "").trim() === "") {
+          e.title = m[2].trim();
+        }
+      }
+    });
+    return list;
+  }
+
   function mergeDuplicates(list) {
     var seen = {}, out = [];
     list.forEach(function (e) {
@@ -371,6 +424,7 @@
   function refreshCalendars() {
     if (DEMO) {
       config = demoConfig();
+      config.who = config.people.concat(config.calendars);
       events = mergeDuplicates(demoEvents());
       lastSync = new Date(); syncError = null;
       applyStatic(); renderAll();
@@ -382,13 +436,15 @@
         if (cfg.error) throw new Error(cfg.error);
         var wxChanged = JSON.stringify(cfg.weather) !== JSON.stringify(config.weather);
         config = cfg;
+        config.people = cfg.people || [];
+        config.who = config.people.concat(cfg.calendars);
         applyStatic();
         if (wxChanged) refreshWeather();
         var range = visibleRange();
         return Promise.all(config.calendars.map(function (c, i) {
           return fetchWithTimeout(withKey("/api/ics/" + i), 30000)
             .then(function (r) { if (!r.ok) throw new Error(c.name + " (HTTP " + r.status + ")"); return r.text(); })
-            .then(function (t) { return { ok: true, list: expandIcs(t, i, range.start, range.end) }; })
+            .then(function (t) { return { ok: true, list: assignPeople(expandIcs(t, i, range.start, range.end), i) }; })
             .catch(function (err) { return { ok: false, err: err }; });
         }));
       })
@@ -398,7 +454,7 @@
           if (r.ok) fresh = fresh.concat(r.list);
           else {
             failed.push(r.err && r.err.message ? r.err.message : config.calendars[i].name);
-            fresh = fresh.concat(events.filter(function (e) { return e.cals[0] === i; }));
+            fresh = fresh.concat(events.filter(function (e) { return e.src === i; }));
           }
         });
         events = mergeDuplicates(fresh);
@@ -448,15 +504,6 @@
   function applyStatic() {
     $("title").textContent = config.title || "Family Calendar";
     document.title = config.title || "Family Calendar";
-    var m = $("members");
-    m.textContent = "";
-    config.calendars.forEach(function (c) {
-      if (c.hidden) return;
-      var row = el("div", "member");
-      var dot = el("span", "dot"); dot.style.background = c.color;
-      row.appendChild(dot); row.appendChild(el("span", null, c.name));
-      m.appendChild(row);
-    });
     var box = $("clocks");
     box.textContent = "";
     (config.clocks || []).forEach(function (c) {
@@ -519,12 +566,11 @@
         cell.appendChild(el("div", "num", ds.getDate()));
         var who = [];
         events.forEach(function (e) {
-          if (overlaps(e, ds, de)) e.cals.forEach(function (c) { if (who.indexOf(c) < 0) who.push(c); });
+          if (overlaps(e, ds, de)) who.push(e.cals[0]);
         });
-        who.sort(function (a, b) { return a - b; });
         var dots = el("div", "dots");
         who.slice(0, 4).forEach(function (c) {
-          var cal = config.calendars[c]; if (!cal) return;
+          var cal = config.who[c]; if (!cal) return;
           var dot = el("span", "dot"); dot.style.background = cal.color; dots.appendChild(dot);
         });
         cell.appendChild(dots);
@@ -612,7 +658,7 @@
   }
 
   function agendaRow(e, ds, de, now) {
-    var cal = config.calendars[e.cals[0]] || { color: "#888", name: "" };
+    var cal = config.who[e.cals[0]] || { color: "#888", name: "" };
     var r = el("div", "row");
     r.style.setProperty("--c", cal.color);
     r.appendChild(el("span", "bar"));
@@ -626,17 +672,79 @@
     r.appendChild(el("span", "tm", label));
     r.appendChild(svgIcon(iconFor(e.title), "ic"));
     r.appendChild(el("span", "nm", e.title));
+    r.appendChild(personPills(e));
+    return r;
+  }
+
+  function personPills(e) {
     var pills = el("span", "pills");
     e.cals.slice(0, 2).forEach(function (ci) {
-      var c = config.calendars[ci]; if (!c) return;
+      var c = config.who[ci]; if (!c) return;
       var p = el("span", "pill", c.name);
       p.style.setProperty("--pbg", hexToRgba(c.color, 0.2));
       p.style.setProperty("--pbd", hexToRgba(c.color, 0.35));
       pills.appendChild(p);
     });
     if (e.cals.length > 2) pills.appendChild(el("span", "pill", "+" + (e.cals.length - 2)));
-    r.appendChild(pills);
-    return r;
+    return pills;
+  }
+
+  // ---------- Up Next ----------
+  function renderUpNext() {
+    var box = $("upnext");
+    var now = new Date(), today = startOfDay(now);
+    var horizon = addDays(today, config.agendaDays || 7);
+    box.textContent = "";
+    var h = el("h2");
+    var clockIc = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    clockIc.setAttribute("viewBox", "0 0 24 24"); clockIc.setAttribute("class", "i");
+    clockIc.innerHTML = '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/>';
+    h.appendChild(clockIc); h.appendChild(el("span", null, "Up Next"));
+    box.appendChild(h);
+
+    var timed = events.filter(function (e) { return !e.allDay && e.end > now && e.start < horizon; })
+      .sort(function (a, b) { return a.start - b.start; });
+    var next = timed[0] || events.filter(function (e) { return e.allDay && e.end > now && e.start < horizon; })
+      .sort(function (a, b) { return a.start - b.start; })[0];
+
+    var body = el("div", "un-body");
+    if (!next) {
+      body.appendChild(el("div", "un-none", "Nothing coming up this week"));
+      box.appendChild(body);
+      return;
+    }
+    var cal = config.who[next.cals[0]] || { color: "#888" };
+    body.style.setProperty("--c", cal.color);
+    body.style.setProperty("--tint", hexToRgba(cal.color, 0.14));
+
+    var head = el("div", "un-head");
+    var ic = el("div", "un-ic");
+    ic.appendChild(svgIcon(iconFor(next.title)));
+    head.appendChild(ic);
+    head.appendChild(el("div", "un-title", next.title));
+    body.appendChild(head);
+    body.appendChild(personPills(next));
+
+    var dayStart = startOfDay(next.start);
+    var dayDiff = Math.round((dayStart - today) / 86400000);
+    var dayLabel = dayDiff <= 0 ? "Today" : dayDiff === 1 ? "Tomorrow" : shortDate(next.start);
+    var count, when;
+    if (next.allDay) {
+      when = dayLabel + " · All day";
+      count = dayDiff <= 0 ? "Today" : "in " + dayDiff + " day" + (dayDiff > 1 ? "s" : "");
+    } else if (next.start <= now) {
+      when = "Until " + fmtTime(next.end);
+      count = "Happening now";
+    } else {
+      when = dayLabel + " · " + fmtTime(next.start);
+      var mins = Math.round((next.start - now) / 60000);
+      if (mins < 60) count = "in " + Math.max(mins, 1) + " min";
+      else if (mins < 24 * 60) count = "in " + Math.floor(mins / 60) + "h " + (mins % 60 ? (mins % 60) + "m" : "");
+      else count = "in " + dayDiff + " day" + (dayDiff > 1 ? "s" : "");
+    }
+    body.appendChild(el("div", "un-when", when));
+    body.appendChild(el("div", "un-count", count.trim()));
+    box.appendChild(body);
   }
 
   function fitAgenda(list) {
@@ -666,7 +774,7 @@
   }
 
   function renderAll() {
-    renderClock(); renderHeaderWeather(); renderMonth(); renderWeatherPanel(); renderAgenda(); renderStatus();
+    renderClock(); renderHeaderWeather(); renderMonth(); renderWeatherPanel(); renderUpNext(); renderAgenda(); renderStatus();
   }
 
   // ---------- screen care ----------
@@ -688,10 +796,11 @@
       weather: { lat: null, lon: null, units: "celsius", name: "Federal Way, WA" },
       night: { start: 22, end: 6, dim: 0.7 },
       clocks: [{ label: "India (IST)", tz: "Asia/Kolkata", flag: "🇮🇳" }, { label: "Qatar (AST)", tz: "Asia/Qatar", flag: "🇶🇦" }],
-      calendars: [
+      people: [
         { name: "Savi", color: "#1F5BFF" }, { name: "Aby", color: "#FF2E7E" },
         { name: "Shan", color: "#14A9B8" }, { name: "Ann", color: "#8A2BF2" }
-      ]
+      ],
+      calendars: [{ name: "Family", color: "#F08A24" }]
     };
   }
   function demoEvents() {
@@ -704,11 +813,11 @@
       E(0, "Team Meeting", 1, 16, 0, 60),
       E(3, "Doctor Appointment", 2, 10, 0, 45), E(2, "Youth Meeting", 2, 18, 0, 90),
       A(0, "Band Practice (School)", 3),
-      E(0, "Gym", 4, 9, 0, 60), E(1, "Family Outing", 4, 13, 0, 180),
-      E(2, "Soccer Game", 5, 10, 0, 90), E(1, "Church", 5, 11, 0, 90)
+      E(0, "Gym", 4, 9, 0, 60), E(4, "Family Outing", 4, 13, 0, 180),
+      E(2, "Soccer Game", 5, 10, 0, 90), E(4, "Church", 5, 11, 0, 90), E(4, "Family Dinner", 1, 18, 30, 90)
     ];
     // sprinkle earlier/later events across the month for the dots
-    var pattern = [[-20, 0], [-18, 1], [-18, 2], [-15, 3], [-13, 1], [-11, 0], [-10, 2], [-9, 3], [-9, 1], [-6, 0], [-4, 3], [-3, 2], [8, 0], [9, 1], [11, 2], [12, 3], [14, 0], [15, 2], [17, 1], [19, 3]];
+    var pattern = [[-20, 0], [-18, 1], [-18, 4], [-15, 3], [-13, 1], [-11, 4], [-10, 2], [-9, 3], [-9, 1], [-6, 0], [-4, 4], [-3, 2], [8, 0], [9, 4], [11, 2], [12, 3], [14, 4], [15, 2], [17, 1], [19, 3]];
     pattern.forEach(function (p, i) { list.push(E(p[1], "Event " + i, p[0], 12, 0, 60)); });
     return list;
   }
@@ -729,7 +838,7 @@
       lastDay = now.getDate();
       refreshCalendars();
     } else {
-      renderClock(); renderAgenda();
+      renderClock(); renderUpNext(); renderAgenda();
     }
     if (now.getMinutes() % 3 === 0) screenCare(now);
     if (now.getHours() === 3 && now.getMinutes() === 30 && Date.now() - bootedAt > 3600000) location.reload();
